@@ -1,0 +1,7 @@
+**/__pycache__
+/psql
+/token
+/test.py
+bot-env
+env
+*.sublime-project
