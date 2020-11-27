@@ -77,7 +77,7 @@ class RSS(commands.Cog):
                 database.insert(
                     table = "rss_feeds",
                     columns = "user_id, url, channel_id, name",
-                    values = f"{ctx.author.id}, '{rss_url}', {ctx.channel.id}, {name}"
+                    values = f"{ctx.author.id}, '{rss_url}', {ctx.channel.id}, '{name}'"
                 )
                 await ctx.send(f"Url has been saved. All updates will be sent to this channel.")
             else:
