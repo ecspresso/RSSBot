@@ -182,8 +182,6 @@ class RSS(commands.Cog):
     async def before_looking(self):
         print("Waiting for bot to start before looking for RSS updates...")
         await self.bot.wait_until_ready()
-        print("The bot is ready. Delaying...")
-        await asyncio.sleep(1)
         print("Ready start RSS functionality.")
 
 def setup(bot):
