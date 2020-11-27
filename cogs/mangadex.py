@@ -2,7 +2,6 @@ import asyncio, discord, feedparser, json, os, re, aiohttp, sys
 from PIL import Image
 from io import BytesIO
 from discord.ext import commands, tasks
-from datetime import datetime, timedelta
 
 # To make loading modules from /modules possible.
 PACKAGE_PARENT = '..'
@@ -48,7 +47,7 @@ class Mangadex(commands.Cog):
     Set the user's RSS url for looking up mangas.
 
     Requires the RSS url. First tries to see if is a valid url. Then does a select against the database to see if there
-    is any prior data for this user's ID. Updates the table is a row is found and inserts into the database if nothing
+    is any prior data for this user's ID. Updates the table if a row is found and inserts into the database if nothing
     is found.
     """
     @commands.command(aliases=['setdex', 'set'])
@@ -170,9 +169,9 @@ class Mangadex(commands.Cog):
         except Exception as error:
             return print(f"Failed to connect to databse: {error}")
 
-        # No data (no user as it set up yet).
+        # No data (no user has it set up yet).
         if len(select) == 0:
-            return print("No user set up yet.")
+            return print("No user set up yet. (Mangadex)")
         else:
             # Loop all users.
             for user in select:
