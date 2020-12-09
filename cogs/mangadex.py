@@ -19,10 +19,16 @@ async def get_rss_feed(rss_url):
             async with session.get(rss_url) as resp:
                 if resp.status == 200:
                     return {'status': resp.status, 'data': await resp.text()}
+                else:
+                    try:
+                        text = await resp.text()
+                    except:
+                        text = 'No text'
+                    return {'status': resp.status, 'data': text}
         except aiohttp.InvalidURL as error:
-            return {'status': -1, 'error': f"{error} is not a valid URL."}
+            return {'status': -1, 'error': f"{error} is not a valid URL.", 'data': None}
         except aiohttp.ClientConnectorError:
-            return {'status': -1, 'error': f"Could not connect to {rss_url}."}
+            return {'status': -1, 'error': f"Could not connect to {rss_url}.", 'data': None}
 
 class Mangadex(commands.Cog):
     def __init__(self, bot):
