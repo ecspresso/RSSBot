@@ -1,5 +1,6 @@
 import asyncio, discord, feedparser, json, os, aiohttp, sys
 from discord.ext import commands, tasks
+from bs4 import BeautifulSoup
 
 # To make loading modules from /modules possible.
 PACKAGE_PARENT = '..'
@@ -163,17 +164,28 @@ class RSS(commands.Cog):
                             # Current update is the latest. Stop looking for more.
                             stop_looking = True
                         else:
+                            # Gather data for embed.
+                            embed_title        = update['title']
+                            embed_post_link    = update['link']
+                            embed_description  = BeautifulSoup(update['description'], features='html.parser').p.text
+                            embed_author_name  = feed['feed']['title_detail']['value']
+                            embed_author_link  = feed['feed']['link']
+                            embed_author_icon  = feed['feed']['image']['href']
+
+                            # Create embed.
+                            embed=discord.Embed(title=embed_title, url=embed_post_link, description=embed_description)
+                            embed.set_author(name=embed_author_name, url=embed_author_link, icon_url=embed_author_icon)
+
+                            # Send update to channel.
+                            await channel.send(embed=embed)
                             # Add name of update.
-                            message.append(f"[{update['title']}]({update['link']})")
 
                         if stop_looking:
-                            # Messages has been set, all updates found. Inform the user.
-                            await channel.send('\n'.join(message))
-
+                            # All updates found.
                             # Update database with new latest update.
                             database.update(
                                 table = "rss_feeds",
-                                values = f"latest='{update['title']}'",
+                                values = f"latest='{feed['entries'][0]['title']}'",
                                 condition = f"WHERE id = {db_id}"
                             )
 
