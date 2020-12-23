@@ -46,7 +46,7 @@ class Mangadex(commands.Cog):
             )
 
         # Start looking for updates as soon as the bot is ready every 15 minutes.
-        self.look_for_updates.start(self.bot)
+        self.look_for_updates_manga.start(self.bot)
 
 
     """
@@ -106,7 +106,7 @@ class Mangadex(commands.Cog):
     updates to the users with new chapters to read.
     """
     @tasks.loop(seconds=900)
-    async def look_for_updates(self, bot, *args):
+    async def look_for_updates_manga(self, bot, *args):
         self.bot = bot
         database = self.psql
 
@@ -122,7 +122,7 @@ class Mangadex(commands.Cog):
             async with aiohttp.ClientSession() as session:
                 async with session.get(manga_url) as resp:
                     if resp.status != 200:
-                        await channel.send(f"Failed to retreive manga {manga_url}.")
+                        return await channel.send(f"Failed to retreive manga. Will try again later.")
 
                     html = await resp.text()
                     manga = json.loads(html)
@@ -281,7 +281,7 @@ class Mangadex(commands.Cog):
                     pass
 
     # Do not start looking before the bot has connected to Discord nad is ready.
-    @look_for_updates.before_loop
+    @look_for_updates_manga.before_loop
     async def before_looking(self):
         print("Waiting for bot to start...")
         await self.bot.wait_until_ready()

@@ -44,7 +44,7 @@ class RSS(commands.Cog):
             )
 
         # Start looking for updates as soon as the bot is ready every 3 hours.
-        self.look_for_updates.start(self.bot)
+        self.look_for_updates_rss.start(self.bot)
 
     """
     Save an RSS URL to parse.
@@ -102,7 +102,7 @@ class RSS(commands.Cog):
 
 
     @tasks.loop(hours=3)
-    async def look_for_updates(self, bot, *args):
+    async def look_for_updates_rss(self, bot, *args):
         self.bot = bot
         database = self.psql
         table = 'rss_feeds'
@@ -132,7 +132,7 @@ class RSS(commands.Cog):
                 # Failed to get data
                 if resp['status'] != 200:
                     if resp['status'] != -1:
-                        return await channel.send(resp['error'])
+                        return await channel.send(resp['status'])
                     else:
                         return await channel.send(f"Got status code {resp['status']}, excepted 200. Please try again later.")
 
@@ -185,7 +185,7 @@ class RSS(commands.Cog):
                     pass
 
     # Do not start looking before the bot has connected to Discord nad is ready.
-    @look_for_updates.before_loop
+    @look_for_updates_rss.before_loop
     async def before_looking(self):
         print("Waiting for bot to start before looking for RSS updates...")
         await self.bot.wait_until_ready()
