@@ -1,4 +1,4 @@
-import asyncio, discord, feedparser, json, os, aiohttp, sys
+import asyncio, discord, feedparser, json, os, sys, psycopg2
 from discord.ext import commands, tasks
 from bs4 import BeautifulSoup
 
@@ -7,27 +7,13 @@ PACKAGE_PARENT = '..'
 SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 
-import modules.psql.psql as psql
+import modules.helper.psql as psql
+import modules.helper.rss_parser as rss_parser
 
 """
 Retreives the data from RSS URL and return the status codes as well as the data. Return -1 if something went wrong.
 """
-async def get_rss_feed(rss_url):
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(rss_url) as resp:
-                if resp.status == 200:
-                    return {'status': resp.status, 'data': await resp.text()}
-                else:
-                    try:
-                        text = await resp.text()
-                    except:
-                        text = 'No text'
-                    return {'status': resp.status, 'data': text}
-        except aiohttp.InvalidURL as error:
-            return {'status': -1, 'error': f"{error} is not a valid URL.", 'data': None}
-        except aiohttp.ClientConnectorError:
-            return {'status': -1, 'error': f"Could not connect to {rss_url}.", 'data': None}
+
 
 class RSS(commands.Cog):
     def __init__(self, bot):
@@ -63,13 +49,21 @@ class RSS(commands.Cog):
         database = self.psql
 
         # Check if valid URL
-        resp = await get_rss_feed(rss_url)
+        resp = await rss_parser.get_rss_feed(rss_url)
         if resp['status'] != 200:
             if resp['status'] == -1:
-                return await ctx.send(resp['error'])
+                await ctx.send(resp['data'])
+                return print(resp['error'])
             else:
-                return await ctx.send(f"Got status code {resp.status}, excepted 200. Please try again later.")
+                # Should not happen?
+                await ctx.send('Unhandled error. Check console for error message.')
+                return print(resp['error'])
 
+        # Get latest post and save it along with the other data.
+        try:
+            feed = feedparser.parse(resp['data'])
+        except Exception as error:
+            return await channel.send(f"Failed to parse the RSS:\n{error}")
 
         try:
             # Connect to the database and look user and RSS name.
@@ -81,11 +75,11 @@ class RSS(commands.Cog):
 
             if len(select) == 0:
                 # RSS was not found.
-                # Add URL, ID, channel ID (the request came from) and name to the database.
+                # Add URL, ID, latest post, channel ID (the request came from) and name to the database.
                 database.insert(
                     table = "rss_feeds",
-                    columns = "user_id, url, channel_id, name",
-                    values = f"{ctx.author.id}, '{rss_url}', {ctx.channel.id}, '{name}'"
+                    columns = "user_id, url, latest, channel_id, name",
+                    values = f"{ctx.author.id}, '{rss_url}', '{feed['entries'][0]['title']}', {ctx.channel.id}, '{name}'"
                 )
                 await ctx.send(f"Url has been saved. All updates will be sent to this channel.")
             else:
@@ -97,7 +91,7 @@ class RSS(commands.Cog):
                     condition = f"WHERE id = '{select[0][0]}'"
                 )
                 await ctx.send(f"URL has been updated. All updates will be sent to this channel.")
-        except Exception as error:
+        except psycopg2.OperationalError as error:
             # Something went wrong.
             await ctx.send(error)
 
@@ -129,7 +123,7 @@ class RSS(commands.Cog):
                 rss_feed_name = rss_feed[5]
 
                 # Get rss data async
-                resp = await get_rss_feed(rss_url)
+                resp = await rss_parser.get_rss_feed(rss_url)
                 # Failed to get data
                 if resp['status'] != 200:
                     if resp['status'] != -1:

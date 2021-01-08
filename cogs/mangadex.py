@@ -8,30 +8,8 @@ PACKAGE_PARENT = '..'
 SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 
-import modules.psql.psql as psql
-
-"""
-Retreives the data from RSS URL and return the status codes as well as the data. Return -1 if something went wrong.
-"""
-async def get_rss_feed(rss_url):
-    async with aiohttp.ClientSession() as session:
-        try:
-            retry_count = 0
-            while retry_count < 5:
-                async with session.get(rss_url) as resp:
-                    if resp.status == 200:
-                        return {'status': resp.status, 'data': await resp.text()}
-                    else:
-                        retry_count += 1
-                        time.sleep(60)
-            if retry_count == 5:
-                raise ValueError('To many failed connection attempts', retry_count)
-        except aiohttp.InvalidURL as error:
-            return {'status': -1, 'data': f"{error} is not a valid URL.", 'error': 'invalid_url_error'}
-        except aiohttp.ClientConnectorError:
-            return {'status': -1, 'data': f"Could not connect to {rss_url}.", 'error': 'connection_error'}
-        except ValueError as error:
-            return {'status': -1, 'data': f"Failed to download data after {error.retry_count} attempts", 'error': 'retry_error'}
+import modules.helper.psql as psql
+import modules.helper.rss_parser as rss_parser
 
 class Mangadex(commands.Cog):
     def __init__(self, bot):
@@ -65,7 +43,7 @@ class Mangadex(commands.Cog):
         database = self.psql
 
         # Check if valid URL
-        resp = get_rss_feed(rss_url)
+        resp = rss_parser.get_rss_feed(rss_url)
         if resp['status'] != 200:
             if data['status'] == -1:
                 if data['error'] == 'invalid_url_error':
@@ -218,7 +196,7 @@ class Mangadex(commands.Cog):
                 channel = self.bot.get_channel(user[3])
 
                 # Get rss data async
-                resp = await get_rss_feed(rss_url)
+                resp = await rss_parser.get_rss_feed(rss_url)
                 # Failed to get data
                 if resp['status'] != 200:
                     if data['status'] == -1:
@@ -273,7 +251,7 @@ class Mangadex(commands.Cog):
                             if not manga_link in updates:
                                 # Prepare data for embed (step 1: get manga data, not just this chapter).
                                 api_link = f"{manga_link[:20]}/api/v2/{manga_link[21:]}"
-                                data = await get_rss_feed(api_link)
+                                data = await rss_parser.get_rss_feed(api_link)
                                 if data['status'] != 200:
                                     if data['status'] == -1:
                                         if data['error'] == 'invalid_url_error':
