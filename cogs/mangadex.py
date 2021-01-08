@@ -410,7 +410,7 @@ class Mangadex(commands.Cog):
     # Do not start looking before the bot has connected to Discord nad is ready.
     @look_for_updates_manga.before_loop
     async def before_looking(self):
-        print("Waiting for bot to start before looking for new manga chapters...")
+        print("MangaDex function is waiting for bot to start.")
         await self.bot.wait_until_ready()
         print("Start looking for updates.")
 

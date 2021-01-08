@@ -193,7 +193,7 @@ class RSS(commands.Cog):
     # Do not start looking before the bot has connected to Discord nad is ready.
     @look_for_updates_rss.before_loop
     async def before_looking(self):
-        print("Waiting for bot to start before looking for RSS updates...")
+        print("RSS function is waiting for bot to start.")
         await self.bot.wait_until_ready()
         print("Ready start RSS functionality.")
 
