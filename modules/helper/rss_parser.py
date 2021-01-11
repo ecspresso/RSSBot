@@ -19,7 +19,7 @@ async def get_rss_feed(rss_url):
                 raise ValueError('To many failed connection attempts', retry_count)
         except aiohttp.InvalidURL as error:
             return {'status': -1, 'data': f"Error: {rss_url} is not a valid URL.", 'error': error}
-        except aiohttp.ClientConnectorError:
+        except aiohttp.ClientConnectorError as error:
             return {'status': -1, 'data': f"Error: Could not connect to {rss_url}.", 'error': error}
         except ValueError as error:
-            return {'status': -1, 'data': f"Error: Could not connect to {error.retry_count} after 5 attempts.", 'error': error}
+            return {'status': -1, 'data': f"Error: Could not connect to {rss_url} after {retry_count} attempts.", 'error': error}
