@@ -164,7 +164,10 @@ class RSS(commands.Cog):
                             embed_description  = BeautifulSoup(update['description'], features='html.parser').p.text
                             embed_author_name  = feed['feed']['title_detail']['value']
                             embed_author_link  = feed['feed']['link']
-                            embed_author_icon  = feed['feed']['image']['href']
+                            try:
+                                embed_author_icon  = feed['feed']['image']['href']
+                            except KeyError:
+                                embed_author_icon = ''
 
                             # Create embed.
                             embed=discord.Embed(title=embed_title, url=embed_post_link, description=embed_description)
