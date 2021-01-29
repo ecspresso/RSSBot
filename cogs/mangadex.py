@@ -199,12 +199,12 @@ class Mangadex(commands.Cog):
                 resp = await rss_parser.get_rss_feed(rss_url)
                 # Failed to get data
                 if resp['status'] != 200:
-                    if data['status'] == -1:
-                        if data['error'] == 'invalid_url_error':
+                    if resp['status'] == -1:
+                        if resp['error'] == 'invalid_url_error':
                             await ctx.send(f'Error: Your URL is not valid <@{user_id}>.')
-                        if data['error'] == 'connection_error':
+                        if resp['error'] == 'connection_error':
                             await ctx.send(f'Error: Could not get updates for <@{user_id}>. Connection failed.')
-                        if data['error'] == 'retry_error':
+                        if resp['error'] == 'retry_error':
                             await ctx.send(f'Error: Could not get updates for <@{user_id}>\' after 5 attempts.')
 
                         print(data['error'])
