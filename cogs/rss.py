@@ -127,9 +127,9 @@ class RSS(commands.Cog):
                 # Failed to get data
                 if resp['status'] != 200:
                     if resp['status'] != -1:
-                        return await channel.send(resp['status'])
+                        return await channel.send(f"Status: {resp['status']}, error: {resp['error']}")
                     else:
-                        return await channel.send(f"Got status code {resp['status']}, excepted 200. Please try again later.")
+                        return await channel.send(f"Could not get updates: {resp['error']}..")
 
                 # Parse data
                 try:
