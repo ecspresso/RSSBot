@@ -6,3 +6,4 @@ bot-env
 env
 *.sublime-*
 test*
+*.code-workspace
