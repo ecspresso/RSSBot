@@ -1,14 +1,12 @@
-import asyncio, discord, feedparser, json, os, sys, psycopg2
+import json
 from discord.ext import commands, tasks
 from bs4 import BeautifulSoup
-
-# To make loading modules from /modules possible.
-PACKAGE_PARENT = '..'
-SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
-sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
-
-import modules.helper.psql as psql
-import modules.helper.rss_parser as rss_parser
+import discord
+import feedparser
+import psycopg2
+# Internal modules
+import cogs.modules.psql as psql
+import cogs.modules.rss_parser as rss_parser
 
 """
 Retreives the data from RSS URL and return the status codes as well as the data. Return -1 if something went wrong.
@@ -63,7 +61,7 @@ class RSS(commands.Cog):
         try:
             feed = feedparser.parse(resp['data'])
         except Exception as error:
-            return await channel.send(f"Failed to parse the RSS:\n{error}")
+            return await ctx.send(f"Failed to parse the RSS:\n{error}")
 
         try:
             # Connect to the database and look user and RSS name.
@@ -81,7 +79,7 @@ class RSS(commands.Cog):
                     columns = "user_id, url, latest, channel_id, name",
                     values = f"{ctx.author.id}, '{rss_url}', '{feed['entries'][0]['title']}', {ctx.channel.id}, '{name}'"
                 )
-                await ctx.send(f"Url has been saved. All updates will be sent to this channel.")
+                await ctx.send("Url has been saved. All updates will be sent to this channel.")
             else:
                 # The RSS feed was found.
                 # Update the URL and the channel ID (the request came from).
@@ -90,7 +88,7 @@ class RSS(commands.Cog):
                     values = f"url='{rss_url}', channel_id={ctx.channel.id}",
                     condition = f"WHERE id = '{select[0][0]}'"
                 )
-                await ctx.send(f"URL has been updated. All updates will be sent to this channel.")
+                await ctx.send("URL has been updated. All updates will be sent to this channel.")
         except psycopg2.OperationalError as error:
             # Something went wrong.
             await ctx.send(error)
@@ -127,9 +125,9 @@ class RSS(commands.Cog):
                 # Failed to get data
                 if resp['status'] != 200:
                     if resp['status'] != -1:
-                        return await channel.send(f"Status: {resp['status']}, error: {resp['error']}")
+                        return await channel.send(f"Received error for <@{user_id}>: {resp['error']}")
                     else:
-                        return await channel.send(f"Could not get updates: {resp['error']}..")
+                        return await channel.send(f"Could not get updates for <@{user_id}>: {resp['error']}.")
 
                 # Parse data
                 try:
@@ -137,7 +135,7 @@ class RSS(commands.Cog):
                 except Exception as error:
                     return await channel.send(f"Failed to parse the RSS:\n{error}")
 
-                if latest == None:
+                if latest is None:
                     # First time parsing this RSS feed.
                     # Save latest update to database.
                     database.update(
@@ -149,7 +147,6 @@ class RSS(commands.Cog):
 
                 elif latest != feed['entries'][0]['title']:
                     # Users has updates.
-                    message = [f"*{rss_feed_name}*"]
                     stop_looking = False
 
                     # Loop all chapters.
@@ -158,6 +155,8 @@ class RSS(commands.Cog):
                             # Current update is the latest. Stop looking for more.
                             stop_looking = True
                         else:
+                            # Message for removed embeds and phone notification text.
+                            message = f"*{rss_feed_name}* - {update['title']}"
                             # Gather data for embed.
                             embed_title        = update['title']
                             embed_post_link    = update['link']
@@ -174,7 +173,7 @@ class RSS(commands.Cog):
                             embed.set_author(name=embed_author_name, url=embed_author_link, icon_url=embed_author_icon)
 
                             # Send update to channel.
-                            await channel.send(embed=embed)
+                            await channel.send(embed=embed, content=message)
                             # Add name of update.
 
                         if stop_looking:

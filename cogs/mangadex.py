@@ -1,15 +1,12 @@
-import asyncio, discord, feedparser, json, os, re, aiohttp, sys, time
-from PIL import Image
+import json
 from io import BytesIO
 from discord.ext import commands, tasks
-
-# To make loading modules from /modules possible.
-PACKAGE_PARENT = '..'
-SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
-sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
-
-import modules.helper.psql as psql
-import modules.helper.rss_parser as rss_parser
+import discord
+import feedparser
+# Internal modules
+import cogs.modules.psql as psql
+import cogs.modules.rss_parser as rss_parser
+import cogs.modules.images as images
 
 class Mangadex(commands.Cog):
     def __init__(self, bot):
@@ -43,21 +40,21 @@ class Mangadex(commands.Cog):
         database = self.psql
 
         # Check if valid URL
-        resp = rss_parser.get_rss_feed(rss_url)
+        resp = await rss_parser.get_rss_feed(rss_url)
         if resp['status'] != 200:
-            if data['status'] == -1:
-                if data['error'] == 'invalid_url_error':
+            if resp['status'] == -1:
+                if resp['error'] == 'invalid_url_error':
                     await ctx.send(f'Error: {rss_url} is not a valid URL.')
-                if data['error'] == 'connection_error':
+                if resp['error'] == 'connection_error':
                     await ctx.send(f'Error: Could not connect to {rss_url}.')
-                if data['error'] == 'retry_error':
+                if resp['error'] == 'retry_error':
                     await ctx.send(f'Error: Could not connect to {rss_url} after 5 attempts.')
 
-                return print(data['error'])
+                return print(resp['error'])
             else:
                 # Should not happen?
                 await ctx.send('Unhandled error. Check console for error message.')
-                return print(data['error'])
+                return print(resp['error'])
 
         try:
             # Connect to the database and look up requesting user.
@@ -75,7 +72,7 @@ class Mangadex(commands.Cog):
                     columns = "rss_feed, user_id, channel_id",
                     values = f"'{rss_url}', {ctx.author.id}, {ctx.channel.id}"
                 )
-                await ctx.send(f"Url has been saved. All updates will be sent to this channel.")
+                await ctx.send("Url has been saved. All updates will be sent to this channel.")
             else:
                 # The user was found.
                 # Update the URL and the channel ID (the request came from).
@@ -84,7 +81,7 @@ class Mangadex(commands.Cog):
                     values = f"rss_feed='{rss_url}', channel_id={ctx.channel.id}",
                     condition = f"WHERE user_id = {ctx.author.id}"
                 )
-                await ctx.send(f"URL has been updated. All updates will be sent to this channel.")
+                await ctx.send("URL has been updated. All updates will be sent to this channel.")
         except Exception as error:
             # Something went wrong.
             await ctx.send(error)
@@ -98,84 +95,6 @@ class Mangadex(commands.Cog):
     async def look_for_updates_manga(self, bot, *args):
         self.bot = bot
         database = self.psql
-
-
-        """ " " " " " " " " " " " "
-        " BEING HELPER FUNCTIONS  "
-        " " " " " " " " " " " " """
-
-        """
-        Gets the cover image and returns a Pillow (PIL) image.
-        """
-        async def get_cover_image(manga_url):
-            async with aiohttp.ClientSession() as session:
-                try:
-                    retry_count = 0
-                    success = False
-                    while retry_count < 5 and not success:
-                        async with session.get(manga_url) as resp:
-                            if resp.status == 200:
-                                html = await resp.text()
-                                manga = json.loads(html)
-                                # Extact link to cover.
-                                cover_url = manga['data']['mainCover']
-                                success = True
-                            else:
-                                retry_count += 1
-                                time.sleep(60)
-                    if retry_count == 5:
-                        raise ValueError('To many failed connection attempts', retry_count)
-
-                    retry_count = 0
-                    while retry_count < 5 and success:
-                        async with session.get(cover_url) as resp:
-                            if resp.status == 200:
-                                # Create an object from the data.
-                                data = BytesIO(await resp.read())
-                                # Create an image from the data.
-                                image = Image.open(data)
-
-                                return {'status': resp.status, 'error': None, 'data': image}
-                            else:
-                                retry_count += 1
-                                time.sleep(60)
-                    if retry_count == 5:
-                        raise ValueError('To many failed connection attempts', retry_count)
-
-                except aiohttp.InvalidURL as error:
-                    return {'status': -1, 'data': f"{error} is not a valid URL.", 'error': 'invalid_url_error'}
-                except aiohttp.ClientConnectorError:
-                    return {'status': -1, 'data': f"Could not connect to {rss_url}.", 'error': 'connection_error'}
-                except ValueError as error:
-                    return {'status': -1, 'data': f"Failed to download data after {data.retry_count} attempts", 'error': 'retry_error'}
-
-        """
-        Takes a list of Pillow (PIL) images and pastes them together horizontally after having resized all images to the
-        height of the smallest image. Aspect ratio is maintained.
-        """
-        async def concatenate_images(img_list):
-            # Get the height of the smallest image and and set it as the max allowed height.
-            max_height = min(x.height for x in img_list)
-            # Loop all images which are too high and resize.
-            for img in [i for i in img_list if i.height > max_height]:
-                img.thumbnail((img.width, max_height), resample=Image.LANCZOS)
-
-            # Calculate the width of the final image.
-            total_width = sum(x.width for x in img_list)
-            # Create an empty image with black color.
-            concatenated_image = Image.new('RGB', (total_width, max_height), (0, 0, 0))
-
-            # Paste each image at X = 0, Y = current_width.
-            current_width = 0
-            for img in img_list:
-                concatenated_image.paste(img, (current_width, 0))
-                current_width += img.width
-
-            return concatenated_image
-
-        """ " " " " " " " " " " "
-        " END HELPER FUNCTIONS  "
-        " " " " " " " " " " " """
 
         # Get all users from database whom we are looking up chapters for.
         try:
@@ -201,18 +120,18 @@ class Mangadex(commands.Cog):
                 if resp['status'] != 200:
                     if resp['status'] == -1:
                         if resp['error'] == 'invalid_url_error':
-                            await ctx.send(f'Error: Your URL is not valid <@{user_id}>.')
+                            await channel.send(f'Error: Your URL is not valid <@{user_id}>.')
                         if resp['error'] == 'connection_error':
-                            await ctx.send(f'Error: Could not get updates for <@{user_id}>. Connection failed.')
+                            await channel.send(f'Error: Could not get updates for <@{user_id}>. Connection failed.')
                         if resp['error'] == 'retry_error':
-                            await ctx.send(f'Error: Could not get updates for <@{user_id}>\' after 5 attempts.')
+                            await channel.send(f'Error: Could not get updates for <@{user_id}>\' after 5 attempts.')
 
-                        print(data['error'])
+                        print(resp['error'])
                         continue
                     else:
                         # Should not happen?
-                        await ctx.send('Unhandled error. Check console for error message.')
-                        return print(data['error'])
+                        await channel.send('Unhandled error. Check console for error message.')
+                        return print(resp['error'])
 
                 # Parse data
                 try:
@@ -220,7 +139,7 @@ class Mangadex(commands.Cog):
                 except Exception as error:
                     return await channel.send(f"Failed to parse the RSS:\n{error}")
 
-                if latest_chapter == None:
+                if latest_chapter is None:
                     # First time looking up chapters.
                     # Save latest chapter's ID to database.
                     database.update(
@@ -255,18 +174,18 @@ class Mangadex(commands.Cog):
                                 if data['status'] != 200:
                                     if data['status'] == -1:
                                         if data['error'] == 'invalid_url_error':
-                                            await ctx.send(f'Error: One of <@{user_id}> updates had an invalid url.\n{manga_link}')
+                                            await channel.send(f'Error: One of <@{user_id}> updates had an invalid url.\n{manga_link}')
                                             print(data['error'])
                                             continue
                                         if data['error'] == 'connection_error':
-                                            await ctx.send(f'Error: Could not get updates for <@{user_id}>. Connection failed.')
+                                            await channel.send(f'Error: Could not get updates for <@{user_id}>. Connection failed.')
                                         if data['error'] == 'retry_error':
-                                            await ctx.send(f'Error: Could not get updates for <@{user_id}>\' after 5 attempts.')
+                                            await channel.send(f'Error: Could not get updates for <@{user_id}>\' after 5 attempts.')
 
                                         return print(data['error'])
                                     else:
                                         # Should not happen?
-                                        await ctx.send('Unhandled error. Check console for error message.')
+                                        await channel.send('Unhandled error. Check console for error message.')
                                         return print(data['error'])
 
                                 manga_data = json.loads(data['data'])
@@ -288,22 +207,23 @@ class Mangadex(commands.Cog):
                                 # Link to image.
                                 url = f"{manga_link[:20]}/api/v2/{manga_link[21:]}"
                                 # Cover image for this manga in Pillow (PIL) format.
-                                image_data = await get_cover_image(url)
+                                image_data = await images.get_cover_image(url)
                                 if image_data['status'] != 200:
                                     if image_data['status'] == -1:
                                         return print(f"Failed to get cover image:\n{image_data['error']}")
                                     else:
                                         # Should not happen?
-                                        await ctx.send('Unhandled error. Check console for error message.')
+                                        await channel.send('Unhandled error. Check console for error message.')
                                         return print(image_data['error'])
                                 else:
                                     updates[manga_link]['image'] = image_data['data']
 
-                            # Add name and link of chapter.
+                            # Add name, link and summary of chapter.
                             # This way makes all the chapters sorted by manga.
                             updates[manga_link]["chapters"].append({
-                                'title': chapter['title'],
-                                'url':   chapter['id']
+                                'title':   chapter['title'],
+                                'url':     chapter['id'],
+                                'summary': chapter['summary']
                             })
 
                             if len(feed['entries']) == count:
@@ -360,20 +280,25 @@ class Mangadex(commands.Cog):
                                         updates_temp[manga_link]["chapters"] = []
 
                                     updates_temp[manga_link]["chapters"].append({
-                                        'title': feed['entries'][index]['title'],
-                                        'url':   feed['entries'][index]['id']
+                                        'title':   feed['entries'][index]['title'],
+                                        'url':     feed['entries'][index]['id'],
+                                        'summary': feed['entries'][index]['summary']
                                     })
 
                                 updates = updates_temp
 
+                            newline = '\n'
+                            # Message for removed embeds and phone notification text.
+                            message = []
                             # Loop all updates and add name and links to embed.
                             for this_update in updates:
                                 for this_chapter in updates[this_update]['chapters']:
                                     embed.add_field(
                                         name=this_chapter['title'],
-                                        value=this_chapter['url'],
+                                        value=f"{this_chapter['url']}{newline}{this_chapter['summary']}",
                                         inline=False
                                     )
+                                    message.append(this_chapter['title'])
 
                                     # Download cover is not already done.
                                     if updates[this_update]['image'] not in img_list:
@@ -381,7 +306,7 @@ class Mangadex(commands.Cog):
 
                             with BytesIO() as image_binary:
                                 # Build the images from all cover images.
-                                tmp_img = await concatenate_images(img_list)
+                                tmp_img = await images.concatenate_images(img_list)
                                 tmp_img.save(image_binary, 'PNG')
                                 # Set image at frame 0.
                                 image_binary.seek(0)
@@ -389,8 +314,10 @@ class Mangadex(commands.Cog):
                                 cover_images = discord.File(fp=image_binary, filename='cover_images.jpg')
                                 # Add file to embed.
                                 embed.set_image(url="attachment://cover_images.jpg")
+                                # Join message into one string.
+                                message = newline.join(message)
                                 # Send.
-                                await channel.send(embed=embed, file=cover_images)
+                                await channel.send(embed=embed, file=cover_images, content=message)
 
 
                             # Update database with new latest chapter.
