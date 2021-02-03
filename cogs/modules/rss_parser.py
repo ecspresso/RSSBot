@@ -1,5 +1,5 @@
-import aiohttp, time
-
+import time
+import aiohttp
 
 """
 Retreives the data from RSS URL and return the status codes as well as the data. Return -1 if something went wrong.

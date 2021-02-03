@@ -1,4 +1,3 @@
-import os
 import psycopg2
 
 class ConnectionError(Exception):
@@ -12,6 +11,8 @@ class PSQL:
         self.password = password
         self.port = port
         self.database = database
+        self.connection = None
+        self.cursor = None
 
     def _connect(self):
         self.connection = psycopg2.connect(
