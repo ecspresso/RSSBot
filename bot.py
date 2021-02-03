@@ -1,4 +1,3 @@
-import discord
 import os
 from discord.ext import commands
 
@@ -36,6 +35,6 @@ async def reload(ctx, extension):
 
 if __name__ == '__main__':
     for file in os.listdir('./cogs'):
-        if file.endswith('.py'):
+        if file.endswith('.py') and file != '__init__.py':
             bot.load_extension(f'cogs.{os.path.splitext(file)[0]}')
     bot.run(token)
