@@ -7,3 +7,4 @@ env
 *.sublime-*
 test*
 *.code-workspace
+geckodriver*
